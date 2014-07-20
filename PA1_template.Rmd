@@ -1,20 +1,170 @@
-# Reproducible Research: Peer Assessment 1
-
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
+---
+"Assignment:Reproducible research"
+author: "Carlo Bonini"
+date: "Friday, July 18, 2014"
+output: html_document
+---
 
 
 
-## Imputing missing values
+Here is the preprocessing code:
+```{r}
+raw<-read.csv("activity.csv")
+
+good<-complete.cases(raw)
+
+goodies<-raw[good,]
+
+```
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+Here I make a simple histogram of steps taken  on a daily basis: 
+
+```{r, echo=TRUE}
+library(sqldf)
+
+day_steps<-sqldf("select distinct(date), sum(steps) from goodies group by date")
+
+hist(day_steps[,2],xlab="steps taken each day",main="Histogram of steps taken each day")
+
+```
+
+While in this other code chunk I calculate both Mean and Median:
+
+
+```{r, echo=TRUE}
+
+average_daily_steps<-mean(day_steps[,2])
+
+Median_daily_steps<-median(day_steps[,2])
+
+average_daily_steps
+
+Median_daily_steps
+```
+
+
+First, I compute the raw data in order to have a Tiny data sets to further computations,and then I make a simple time_series plot using the Base-Plotting system of the average steps taken by interval, averaged across all days: 
+
+```{r, echo=TRUE}
+average_daily_steps_per_interval<-sqldf("select interval, avg(steps) from goodies group by interval")
+
+plot(average_daily_steps_per_interval[,1],
+     average_daily_steps_per_interval[,2],type="l",main="Average Steps per interval",xlab="Intervals",ylab="average daily steps")
+
+```
+
+Finally I calculate the interval during the day that scored the highest number of steps (the result also the number of steps) :
+
+```{r, echo=TRUE}
+
+max_steps_interval<-subset(average_daily_steps_per_interval,
+                           average_daily_steps_per_interval[,2]==
+                               max(average_daily_steps_per_interval[,2]))
+
+max_steps_interval
+```
+
+The total number of NAs is 
+```{r, echo=TRUE}
+
+Number_of_NA<-as.data.frame(length(raw[is.na(raw)]))
+
+Number_of_NA
+```
+
+And the way I intended to substitute them is by subsitute each of them with the average of the interval calculated above(across all days):
+The solution I decided to use to accomplish this is quite a bit complicated(I know there are simpler way to do that);
+- First, I merged the data frame calculated early of the average steps taken by interval with the raw data, so that for each row we have the mean of the relative interval
+- Then I subsitute the NA's with the relative mean that is in column 4 after the merge.
+
+```{r, echo=TRUE}
+
+merged_raw_average<-merge(average_daily_steps_per_interval,raw,by="interval")
+
+
+for (i in 1:nrow(merged_raw_average)) {
+
+  if (is.na(merged_raw_average[i,3])){
+  
+  merged_raw_average[i,3]<-merged_raw_average[i,2]
+
+  }
+
+}
+
+```
+
+
+I made a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. 
+
+The  values don't differ from the estimates from the first part of the assignment.
+
+```{r, echo=TRUE}
+
+day_steps_new<-sqldf("select distinct(date), sum(steps) from merged_raw_average group by date")
+
+hist(as.numeric(as.character(day_steps_new[,2])),xlab="steps taken each day",main="Histogram of steps taken each day")
+
+average_daily_steps_new<-mean(day_steps_new[,2])
+
+median_daily_steps_new<-median(day_steps_new[,2],na.rm = FALSE)
+
+average_daily_steps_new
+
+median_daily_steps_new
+
+```
+
+
+So, the new data frame has 4 column and no NA's.
+I transform the column of the date into a more useful format by assigning the weekdays value to each cell, so that is easy to understand whether a day is weekend or weekday.
+
+
+```{r, echo=TRUE}
+
+merged_raw_average[,4]<-as.Date(merged_raw_average[,4],origin="1960-01-01")
+
+merged_raw_average[,4]<-weekdays(merged_raw_average[,4])
+
+```
+
+Here I have subset the data frame based on the fact that in column 3 there were weekend days (in italian: sabato and domenica) and subset again based on all the other values.
+Then i bind them together again after assigning a factor variable that indicates whether is weekday or weekend:
+
+In the end I subset the final database using the package sqldf in order to get the average per interval across all days as above; I get two different dataframes per weekends data and weekdays data.
+
+
+```{r, echo=TRUE}
+
+weekend<-subset(merged_raw_average,merged_raw_average$date=="sabato" | merged_raw_average$date=="domenica")
+
+weekend["type_of_day"]<-"weekend"
+
+weekday<-subset(merged_raw_average,merged_raw_average$date!="sabato"&merged_raw_average$date!="domenica")
+
+weekday["type_of_day"]<-"weekday"
+
+final_database<-rbind(weekday,weekend)
+
+weekday_average_daily_steps<-sqldf("select interval, avg(steps) from final_database where type_of_day= 'weekday' group by interval")
+
+weekend_average_daily_steps<-sqldf("select interval, avg(steps) from final_database where type_of_day= 'weekend' group by interval")
+
+
+```
+
+Finally, we can make the plot using the base plotting system:
+
+```{r, echo=TRUE}
+
+plot(weekday_average_daily_steps[,1],
+     weekday_average_daily_steps[,2],type="l",main="WEEKDAY",xlab="Intervals",ylab="average daily steps")
+
+plot(weekend_average_daily_steps[,1],
+     weekend_average_daily_steps[,2],type="l",main="WEEKEND",xlab="Intervals",ylab="average daily steps")
+
+
+
+```
