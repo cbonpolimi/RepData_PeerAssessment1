@@ -1,14 +1,14 @@
 ---
-"Assignment:Reproducible research"
+title: "PA2_template.Rmd"
 author: "Carlo Bonini"
-date: "Friday, July 18, 2014"
+date: "Sunday, July 20, 2014"
 output: html_document
 ---
 
 
-
 Here is the preprocessing code:
 ```{r}
+
 raw<-read.csv("activity.csv")
 
 good<-complete.cases(raw)
